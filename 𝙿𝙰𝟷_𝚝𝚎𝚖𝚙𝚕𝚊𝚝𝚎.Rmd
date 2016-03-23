@@ -1,0 +1,105 @@
+---
+title: "Assignment: Course Project 1"
+date: "March 13, 2016"
+output:
+  html_document:
+    keep_md: true
+---
+
+## Background
+
+It is now possible to collect a large amount of data about personal movement using activity monitoring devices such as a Fitbit, Nike Fuelband, or Jawbone Up. These type of devices are part of the “quantified self” movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. But these data remain under-utilized both because the raw data are hard to obtain and there is a lack of statistical methods and software for processing and interpreting the data.
+
+This assignment makes use of data from a personal activity monitoring device. This device collects data at 5 minute intervals through out the day. The data consists of two months of data from an anonymous individual collected during the months of October and November, 2012 and include the number of steps taken in 5 minute intervals each day.
+
+## Data
+
+```{r}
+## Load libraries needed
+library(knitr)
+library(dplyr)
+library(Hmisc)
+library(timeDate)
+
+# Read in the data to use. 
+data <- read.table(unz("activity.zip","activity.csv"), sep = ",", na.strings = "NA", header = TRUE)
+```
+
+## Exploring The Data
+```{r}
+names(data)
+dim(data)
+```
+
+## Cleaning The Data 
+```{r}
+# Subset into a data set that does not have NA values.
+dataclean <- subset(data,!(is.na(data$steps)))
+
+```
+## Split & Subset The Data
+```{r}
+# Calculate the total number of steps taken per day
+daysgrouped <- group_by(dataclean, date)
+stepsperday <- summarise(daysgrouped, stepssum = sum(steps))
+stepsperday
+
+# Make a histogram of the total number of steps taken each day
+hist(stepsperday$stepssum, main="Histogram", xlab="Total Number Of Steps In A Day", ylab="Count")
+
+# Calculate and report the mean and median of the total number of steps taken per day
+avgsteps <- mean(stepsperday$stepssum)
+avgsteps
+median(stepsperday$stepssum)
+
+intervalgrouped <- group_by(dataclean, interval)
+stepsperinterval <- summarise(intervalgrouped, stepsintervalsum = mean(steps))
+
+plot(stepsperinterval$interval, stepsperinterval$stepsintervalsum, type='l', main="Time Series Plot", xlab="5 Minute Interval", ylab="Average Number Of Steps")
+
+# Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+maximum <- which.max(stepsperinterval$stepsintervalsum)
+stepsperinterval[maximum,]
+
+# Sum NA count
+nacount <- sum(is.na(data$steps))
+
+# Impute missing values with the mean for that 5-minute interval.
+# I got help from Stack Exchange on this one: http://stackoverflow.com/questions/9322773/how-to-replace-na-with-mean-by-subset-in-r-impute-with-plyr
+impute.mean <- function(x) replace(x, is.na(x), mean(x, na.rm = TRUE))
+
+# Create a new dataset that is equal to the original dataset but with the missing data filled in.
+data2 <- data %>%
+    group_by(interval) %>%
+    mutate(steps = impute.mean(steps))
+
+daysgrouped2 <- group_by(data2, date)
+stepsperday2 <- summarise(daysgrouped, stepssum = sum(steps))
+
+# Histogram of the total number of steps taken each day.
+hist(stepsperday2$stepssum, main="Histogram", xlab="Total Number Of Steps In A Day", ylab="Count")
+
+# Calculate and report the mean and median total number of steps taken per day.
+avgsteps <- mean(stepsperday2$stepssum)
+avgsteps
+median(stepsperday2$stepssum)
+```
+
+These values don't really differ from the original estimates? There is not a large impact of imputing missing data on the estimates.
+
+```{r}
+data2$weekend <- isWeekend(data2$date)
+
+data2weekend <- subset(data2, weekend == "TRUE")
+data2weekday <- subset(data2, weekend == "FALSE")
+
+intervalgrouped <- group_by(data2weekend, interval)
+stepsperinterval <- summarise(intervalgrouped, stepsintervalsum = mean(steps))
+
+plot(stepsperinterval$interval, stepsperinterval$stepsintervalsum, type='l', main="Time Series Plot (Weekend)", xlab="5 Minute Interval", ylab="Average Number Of Steps Taken")
+
+intervalgrouped <- group_by(data2weekday, interval)
+stepsperinterval <- summarise(intervalgrouped, stepsintervalsum = mean(steps))
+
+plot(stepsperinterval$interval, stepsperinterval$stepsintervalsum, type='l', main="Time Series Plot (Weekday)", xlab="5 Minute Interval", ylab="Average Number Of Steps Taken")
+```
